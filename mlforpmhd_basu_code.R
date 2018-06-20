@@ -1,6 +1,11 @@
 # Machine learning for precision medicine and health disparities, 2018
 # Sanjay Basu, basus@stanford.edu
 
+# this code borrows heavily from other sources who have open-sourced their code and deserve credit as primary sources, specifically:
+# https://github.com/ledell/sldm4-h2o/blob/master/sldm4-deeplearning-h2o.Rmd
+# http://docs.h2o.ai/h2o/latest-stable/h2o-docs/index.html
+# https://gist.github.com/ledell/102a24eef72bdc4ea2cd876492095684
+
 # first, install and initialize the R packages used in this example [must be connected to the Internet]
 rm(list=ls())
 pkgs <- c("RCurl","jsonlite","DMwR","caret","lattice","ggplot2","grid","data.table")
@@ -8,6 +13,8 @@ for (pkg in pkgs) {
   if (! (pkg %in% rownames(installed.packages()))) { install.packages(pkg) }
 }
 install.packages("h2o", type="source", repos="http://h2o-release.s3.amazonaws.com/h2o/rel-wright/2/R")
+# you only have to do the above installation steps once on any given machine
+
 library(h2o)
 h2o.init()
 
@@ -127,7 +134,12 @@ library(data.table)
 ggplot(data.table(fpr = fpr, tpr = tpr), aes(fpr, tpr)) + # ROC curve with false positive rate on x and true positive rate on y
   geom_line() + theme_bw() + ggtitle( sprintf('AUC: %f', auc)) # AUC or C stat
 
+# variable importance plot
+h2o.varimp_plot(best_model)
 
+# partial dependence plot
+h2o.partialPlot(best_model,data=test,cols=c("X91","X100"))
+  
 
 # next, let's try a stacked ensemble of GBM and RF learners
 
@@ -135,7 +147,7 @@ ggplot(data.table(fpr = fpr, tpr = tpr), aes(fpr, tpr)) + # ROC curve with false
 # Number of cross-validation folds (to generate level-one data for stacking)
 nfolds <- 5
 
-# There are a few ways to assemble a list of models to stack toegether:
+# There are a few ways to assemble a list of models to stack together:
 # 1. Train individual models and put them in a list
 # 2. Train a grid of models
 # 3. Train several grids of models
@@ -189,7 +201,7 @@ print(sprintf("Ensemble Test AUC:  %s", ensemble_auc_test))
 
 # 2. Generate a random grid of models and stack them together
 
-# GBM Hyperparamters
+# GBM parameters
 learn_rate_opt <- c(0.01, 0.03)
 max_depth_opt <- c(3, 4, 5, 6, 9)
 sample_rate_opt <- c(0.7, 0.8, 0.9, 1.0)
@@ -240,7 +252,7 @@ print(sprintf("Ensemble Test AUC:  %s", ensemble_auc_test))
 # The current version of AutoML trains and cross-validates a default Random Forest (DRF), an Extremely Randomized Forest (XRT), a random grid of Gradient Boosting Machines (GBMs), a random grid of Deep Neural Nets, a fixed grid of GLMs. AutoML then trains two Stacked Ensemble models. Particular algorithms (or groups of algorithms) can be switched off using the exclude_algos argument. This is useful if you already have some idea of the algorithms that will do well on your dataset. As a recommendation, if you have really wide or sparse data, you may consider skipping the tree-based algorithms (GBM, DRF).
 aml <- h2o.automl(x = x, y = y,
                   training_frame = train,
-                  max_runtime_secs = 30)
+                  max_runtime_secs = 300)
 
 # The AutoML object includes a “leaderboard” of models that were trained in the process, including the 5-fold cross-validated model performance (by default). 
 # The number of folds used in the model evaluation process can be adjusted using the nfolds parameter. 
@@ -251,6 +263,7 @@ lb
 # The models are ranked by a default metric based on the problem type (the second column of the leaderboard). In binary classification problems, that metric is AUC, and in multiclass classification problems, the metric is mean per-class error. In regression problems, the default sort metric is deviance. Some additional metrics are also provided, for convenience.
 # The leader model is stored here
 aml@leader
+
 
 
 
